@@ -15,7 +15,6 @@ const App = () => {
   return (
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <div className="min-h-screen bg-black">
         <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -28,7 +27,6 @@ const App = () => {
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
-        </div>
     </React.StrictMode>
   );
 };
