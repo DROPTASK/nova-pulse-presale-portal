@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { BrowserProvider, Contract, formatEther, parseEther } from 'ethers';
 import { toast } from '@/hooks/use-toast';
@@ -16,8 +15,8 @@ export type NetworkChain = {
   symbol: string;
   rpcUrl: string;
   explorerUrl: string;
-  tokens: ('NATIVE' | 'USDT')[];
-  usdt?: string; // USDT contract address
+  tokens: ('NATIVE')[];
+  minTransaction?: number;
 };
 
 export const SUPPORTED_NETWORKS: NetworkChain[] = [
@@ -27,8 +26,7 @@ export const SUPPORTED_NETWORKS: NetworkChain[] = [
     symbol: 'ETH',
     rpcUrl: 'https://mainnet.infura.io/v3/your-infura-key',
     explorerUrl: 'https://etherscan.io',
-    tokens: ['NATIVE', 'USDT'],
-    usdt: '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+    tokens: ['NATIVE']
   },
   {
     id: '0x38',
@@ -36,26 +34,16 @@ export const SUPPORTED_NETWORKS: NetworkChain[] = [
     symbol: 'BNB',
     rpcUrl: 'https://bsc-dataseed.binance.org',
     explorerUrl: 'https://bscscan.com',
-    tokens: ['NATIVE', 'USDT'],
-    usdt: '0x55d398326f99059fF775485246999027B3197955'
+    tokens: ['NATIVE']
   },
   {
-    id: '0xa',
-    name: 'Optimism',
-    symbol: 'ETH',
-    rpcUrl: 'https://mainnet.optimism.io',
-    explorerUrl: 'https://optimistic.etherscan.io',
-    tokens: ['USDT'],
-    usdt: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58'
-  },
-  {
-    id: '0x29a',
-    name: 'TON',
-    symbol: 'TON',
-    rpcUrl: 'https://ton-rpc.gateway.pokt.network',
-    explorerUrl: 'https://tonscan.org',
-    tokens: ['USDT'],
-    usdt: '0x76A797A59Ba2C17726896976B7B3747BfD1d220f'
+    id: '0x89',
+    name: 'Polygon',
+    symbol: 'POL',
+    rpcUrl: 'https://polygon-rpc.com',
+    explorerUrl: 'https://polygonscan.com',
+    tokens: ['NATIVE'],
+    minTransaction: 1
   }
 ];
 

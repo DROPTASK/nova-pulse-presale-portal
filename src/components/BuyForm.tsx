@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { useWeb3 } from '../contexts/Web3Context';
 import { toast } from '@/hooks/use-toast';
 import { NetworkChain, SUPPORTED_NETWORKS } from '../contexts/Web3Context';
-import { ChevronDown } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -16,27 +15,29 @@ import {
 const BuyForm = () => {
   const { account, isConnected, sendTransaction, currentNetwork, switchNetwork } = useWeb3();
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkChain | null>(null);
-  const [selectedToken, setSelectedToken] = useState<'NATIVE' | 'USDT'>('NATIVE');
   const [amount, setAmount] = useState('');
   const [novaAmount, setNovaAmount] = useState('0');
+  const [bonusAmount, setBonusAmount] = useState('0');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const TOKEN_PRICE_USD = 0.004;
   const ETH_PRICE_USD = 2000; // Mock ETH price
   const BNB_PRICE_USD = 500; // Mock BNB price
-  const USDT_PRICE_USD = 1;
+  const POL_PRICE_USD = 1; // Mock POL price
   const CONTRACT_ADDRESS = '0xeD469Cb8d74467aD1c2F566C2067856341e97528';
+
+  const getPresaleBonus = (tokenAmount: number) => {
+    if (tokenAmount >= 1000000) return tokenAmount; // 1M tokens = 1M bonus
+    if (tokenAmount >= 100000) return 100000; // 100K tokens = 100K bonus
+    if (tokenAmount >= 10000) return 10000; // 10K tokens = 10K bonus
+    if (tokenAmount >= 2500) return 2500; // 2.5K tokens = 2.5K bonus
+    return 0;
+  };
 
   useEffect(() => {
     // Initialize with current network if connected
     if (currentNetwork) {
       setSelectedNetwork(currentNetwork);
-      // Set default token based on available tokens
-      if (currentNetwork.tokens.includes('NATIVE')) {
-        setSelectedToken('NATIVE');
-      } else if (currentNetwork.tokens.includes('USDT')) {
-        setSelectedToken('USDT');
-      }
     } else {
       // Default to Ethereum if not connected
       setSelectedNetwork(SUPPORTED_NETWORKS[0]);
@@ -44,33 +45,26 @@ const BuyForm = () => {
   }, [currentNetwork]);
 
   useEffect(() => {
-    // If network changes, check if the selected token is still valid
-    if (selectedNetwork) {
-      if (!selectedNetwork.tokens.includes(selectedToken)) {
-        setSelectedToken(selectedNetwork.tokens[0]);
-      }
-    }
-  }, [selectedNetwork, selectedToken]);
-
-  useEffect(() => {
     if (amount && selectedNetwork) {
-      let tokenPriceUSD = USDT_PRICE_USD;
+      let tokenPriceUSD = POL_PRICE_USD;
       
-      if (selectedToken === 'NATIVE') {
-        if (selectedNetwork.symbol === 'ETH') {
-          tokenPriceUSD = ETH_PRICE_USD;
-        } else if (selectedNetwork.symbol === 'BNB') {
-          tokenPriceUSD = BNB_PRICE_USD;
-        }
+      if (selectedNetwork.symbol === 'ETH') {
+        tokenPriceUSD = ETH_PRICE_USD;
+      } else if (selectedNetwork.symbol === 'BNB') {
+        tokenPriceUSD = BNB_PRICE_USD;
       }
       
       const usdValue = parseFloat(amount) * tokenPriceUSD;
       const tokens = usdValue / TOKEN_PRICE_USD;
+      const bonus = getPresaleBonus(tokens);
+      
       setNovaAmount(tokens.toLocaleString());
+      setBonusAmount(bonus.toLocaleString());
     } else {
       setNovaAmount('0');
+      setBonusAmount('0');
     }
-  }, [amount, selectedToken, selectedNetwork]);
+  }, [amount, selectedNetwork]);
 
   const handleNetworkChange = async (networkId: string) => {
     const network = SUPPORTED_NETWORKS.find(n => n.id === networkId);
@@ -93,19 +87,6 @@ const BuyForm = () => {
           });
         }
       }
-      
-      // Reset token selection based on network support
-      if (network.tokens.includes('NATIVE')) {
-        setSelectedToken('NATIVE');
-      } else {
-        setSelectedToken('USDT');
-      }
-    }
-  };
-
-  const handleTokenChange = (token: 'NATIVE' | 'USDT') => {
-    if (selectedNetwork && selectedNetwork.tokens.includes(token)) {
-      setSelectedToken(token);
     }
   };
 
@@ -148,13 +129,21 @@ const BuyForm = () => {
       return;
     }
 
-    let tokenPriceUSD = USDT_PRICE_USD;
-    if (selectedToken === 'NATIVE') {
-      if (selectedNetwork.symbol === 'ETH') {
-        tokenPriceUSD = ETH_PRICE_USD;
-      } else if (selectedNetwork.symbol === 'BNB') {
-        tokenPriceUSD = BNB_PRICE_USD;
-      }
+    // Check minimum transaction for Polygon
+    if (selectedNetwork.symbol === 'POL' && parseFloat(amount) < (selectedNetwork.minTransaction || 1)) {
+      toast({
+        title: "Minimum transaction",
+        description: `Minimum transaction amount is ${selectedNetwork.minTransaction} ${selectedNetwork.symbol}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let tokenPriceUSD = POL_PRICE_USD;
+    if (selectedNetwork.symbol === 'ETH') {
+      tokenPriceUSD = ETH_PRICE_USD;
+    } else if (selectedNetwork.symbol === 'BNB') {
+      tokenPriceUSD = BNB_PRICE_USD;
     }
     
     const usdValue = parseFloat(amount) * tokenPriceUSD;
@@ -180,26 +169,24 @@ const BuyForm = () => {
     setIsProcessing(true);
 
     try {
-      let txHash;
+      console.log(`Sending ${amount} ${selectedNetwork.symbol} to ${CONTRACT_ADDRESS}`);
+      const txHash = await sendTransaction(CONTRACT_ADDRESS, amount);
       
-      if (selectedToken === 'NATIVE') {
-        console.log(`Sending ${amount} ${selectedNetwork.symbol} to ${CONTRACT_ADDRESS}`);
-        txHash = await sendTransaction(CONTRACT_ADDRESS, amount);
-      } else {
-        // USDT transaction would go here - for demo purposes, we're just showing a message
-        console.log(`Would send ${amount} USDT from ${selectedNetwork.name} to ${CONTRACT_ADDRESS}`);
-        toast({
-          title: "USDT transactions",
-          description: `Sending USDT requires contract interaction which is not implemented in this demo`,
-          variant: "destructive",
-        });
-        setIsProcessing(false);
-        return;
-      }
+      // Store transaction in localStorage for history
+      const transactions = JSON.parse(localStorage.getItem('novaTransactions') || '[]');
+      transactions.push({
+        hash: txHash,
+        amount: amount,
+        token: selectedNetwork.symbol,
+        timestamp: Date.now(),
+        novaAmount: novaAmount,
+        bonusAmount: bonusAmount
+      });
+      localStorage.setItem('novaTransactions', JSON.stringify(transactions));
       
       toast({
         title: "Transaction sent!",
-        description: `Transaction hash: ${txHash.slice(0, 10)}... NOVA tokens will be sent to your wallet automatically.`,
+        description: `Transaction hash: ${txHash.slice(0, 10)}... NOVA tokens will be sent to your wallet after token launch.`,
       });
 
       setAmount('');
@@ -252,56 +239,28 @@ const BuyForm = () => {
                         value={network.id}
                         className="text-white hover:bg-gray-700"
                       >
-                        {network.name}
+                        {network.name} ({network.symbol})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Currency Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Select Currency
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  {selectedNetwork?.tokens.map((token) => (
-                    <motion.button
-                      key={token}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleTokenChange(token)}
-                      className={`p-4 rounded-lg border transition-all duration-300 ${
-                        selectedToken === token
-                          ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400'
-                          : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                      }`}
-                    >
-                      <div className="text-lg font-semibold">
-                        {token === 'NATIVE' ? selectedNetwork?.symbol : token}
-                      </div>
-                      <div className="text-sm opacity-75">
-                        {token === 'NATIVE' ? 
-                          (selectedNetwork?.symbol === 'ETH' ? '$2,000' : 
-                           selectedNetwork?.symbol === 'BNB' ? '$500' : '$1.00') 
-                          : '$1.00'
-                        }
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
               {/* Amount Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Amount ({selectedToken === 'NATIVE' ? selectedNetwork?.symbol : 'USDT'})
+                  Amount ({selectedNetwork?.symbol})
+                  {selectedNetwork?.minTransaction && (
+                    <span className="text-yellow-400 ml-2">
+                      (Min: {selectedNetwork.minTransaction} {selectedNetwork.symbol})
+                    </span>
+                  )}
                 </label>
                 <input
                   type="number"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder={`Enter ${selectedToken === 'NATIVE' ? selectedNetwork?.symbol : 'USDT'} amount`}
+                  placeholder={`Enter ${selectedNetwork?.symbol} amount`}
                   className="w-full p-4 bg-black/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-cyan-500 focus:outline-none transition-all duration-300"
                   step="0.001"
                   min="0"
@@ -314,16 +273,31 @@ const BuyForm = () => {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   transition={{ duration: 0.3 }}
-                  className="bg-gradient-to-r from-cyan-500/10 to-purple-500/10 p-4 rounded-lg border border-cyan-500/20"
+                  className="space-y-4"
                 >
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-cyan-400">
-                      {novaAmount} NOVA
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      You will receive approximately
+                  <div className="bg-gradient-to-r from-cyan-500/10 to-purple-500/10 p-4 rounded-lg border border-cyan-500/20">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-cyan-400">
+                        {novaAmount} NOVA
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        You will receive
+                      </div>
                     </div>
                   </div>
+                  
+                  {bonusAmount !== '0' && (
+                    <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4 rounded-lg border border-purple-500/20">
+                      <div className="text-center">
+                        <div className="text-xl font-bold text-purple-400">
+                          +{bonusAmount} NOVA BONUS! 🎉
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          Presale bonus tokens
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
 
@@ -345,8 +319,19 @@ const BuyForm = () => {
                   ? 'Connect Wallet First'
                   : !selectedNetwork
                   ? 'Select Network'
-                  : `Buy NOVA with ${selectedToken === 'NATIVE' ? selectedNetwork.symbol : 'USDT'}`}
+                  : `Buy NOVA with ${selectedNetwork.symbol}`}
               </motion.button>
+
+              {/* Presale Bonus Info */}
+              <div className="bg-black/30 rounded-lg p-4 border border-gray-600">
+                <h4 className="text-lg font-semibold text-purple-400 mb-2">🎁 Presale Bonuses</h4>
+                <div className="space-y-1 text-sm text-gray-300">
+                  <div>• Buy 2,500+ tokens → Get 2,500 bonus tokens</div>
+                  <div>• Buy 10,000+ tokens → Get 10,000 bonus tokens</div>
+                  <div>• Buy 100,000+ tokens → Get 100,000 bonus tokens</div>
+                  <div>• Buy 1,000,000+ tokens → Get 1,000,000 bonus tokens</div>
+                </div>
+              </div>
 
               {/* Important Notes */}
               <div className="text-sm text-gray-400 space-y-2">
@@ -360,7 +345,7 @@ const BuyForm = () => {
                 </div>
                 <div className="text-center pt-4 border-t border-gray-600">
                   <p className="text-green-400">
-                    ✅ Tokens will be automatically sent to your wallet after transaction confirmation
+                    ✅ Tokens will be sent after token launch
                   </p>
                 </div>
               </div>
