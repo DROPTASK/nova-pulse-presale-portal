@@ -1,5 +1,7 @@
 
 import React from 'react';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import HeroSection from '../components/HeroSection';
 import BuyForm from '../components/BuyForm';
@@ -13,9 +15,6 @@ import AnimatedBackground from '../components/AnimatedBackground';
 import WalletAssets from '../components/WalletAssets';
 import AirdropPage from '../components/AirdropPage';
 import HistoryPage from '../components/HistoryPage';
-import { Web3Provider } from '../contexts/Web3Context';
-import { useState } from 'react';
-import { motion } from 'framer-motion';
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<'main' | 'airdrop' | 'history'>('main');
@@ -61,13 +60,11 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
-      <Web3Provider>
-        <AnimatedBackground />
-        <Header />
-        {renderCurrentView()}
-        <Footer />
-      </Web3Provider>
+    <div className="min-h-screen bg-black text-white">
+      <AnimatedBackground />
+      <Header />
+      {renderCurrentView()}
+      <Footer />
     </div>
   );
 };
