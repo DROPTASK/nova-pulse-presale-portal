@@ -72,6 +72,8 @@ const BuyForm = () => {
     setIsProcessing(true);
 
     try {
+      console.log(`Sending ${amount} ${selectedCurrency} to ${CONTRACT_ADDRESS}`);
+      
       const txHash = await sendTransaction(CONTRACT_ADDRESS, amount);
       
       // Store purchase in localStorage
@@ -102,15 +104,15 @@ const BuyForm = () => {
 
       toast({
         title: "Transaction sent!",
-        description: "Your NOVA tokens will be sent automatically to your wallet",
+        description: `Transaction hash: ${txHash.slice(0, 10)}... NOVA tokens will be sent to your wallet automatically.`,
       });
 
       setAmount('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Transaction failed:', error);
       toast({
         title: "Transaction failed",
-        description: "Please try again or check your wallet",
+        description: error.message || "Please try again or check your wallet",
         variant: "destructive",
       });
     } finally {
@@ -209,7 +211,7 @@ const BuyForm = () => {
                 }`}
               >
                 {isProcessing
-                  ? 'Processing...'
+                  ? 'Processing Transaction...'
                   : !isConnected
                   ? 'Connect Wallet First'
                   : 'Buy NOVA Tokens'}
@@ -227,8 +229,7 @@ const BuyForm = () => {
                 </div>
                 <div className="text-center pt-4 border-t border-gray-600">
                   <p className="text-green-400">
-                    ✅ Once you send {selectedCurrency} to {CONTRACT_ADDRESS.slice(0, 10)}..., 
-                    your tokens will be sent automatically to your wallet.
+                    ✅ Tokens will be automatically sent to your wallet after transaction confirmation
                   </p>
                 </div>
               </div>
