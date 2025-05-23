@@ -4,11 +4,27 @@ import { motion } from 'framer-motion';
 import { useWeb3 } from '../contexts/Web3Context';
 
 const WalletAssets = () => {
-  const { account, isConnected, balance } = useWeb3();
+  const { account, isConnected, balance, currentNetwork } = useWeb3();
 
   if (!isConnected) {
     return null;
   }
+
+  // Calculate USD value based on the current network
+  const getUsdValue = () => {
+    if (!currentNetwork) return 0;
+
+    let tokenPrice = 0;
+    if (currentNetwork.symbol === 'ETH') {
+      tokenPrice = 2000; // Mock ETH price
+    } else if (currentNetwork.symbol === 'BNB') {
+      tokenPrice = 500; // Mock BNB price
+    } else {
+      tokenPrice = 1; // Default
+    }
+
+    return parseFloat(balance) * tokenPrice;
+  };
 
   return (
     <section className="relative py-12">
@@ -37,9 +53,11 @@ const WalletAssets = () => {
               
               <div className="bg-black/30 rounded-lg p-4 border border-gray-600">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">ETH Balance:</span>
+                  <span className="text-gray-400">
+                    {currentNetwork ? `${currentNetwork.symbol} Balance:` : 'Balance:'}
+                  </span>
                   <span className="text-green-400 font-semibold">
-                    {parseFloat(balance).toFixed(4)} ETH
+                    {parseFloat(balance).toFixed(4)} {currentNetwork?.symbol || 'ETH'}
                   </span>
                 </div>
               </div>
@@ -48,8 +66,17 @@ const WalletAssets = () => {
                 <div className="text-center">
                   <div className="text-sm text-gray-400 mb-1">Estimated USD Value</div>
                   <div className="text-xl font-bold text-cyan-400">
-                    ${(parseFloat(balance) * 2000).toFixed(2)}
+                    ${getUsdValue().toFixed(2)}
                   </div>
+                </div>
+              </div>
+
+              <div className="bg-black/30 rounded-lg p-4 border border-gray-600">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Current Network:</span>
+                  <span className="text-purple-400 font-semibold">
+                    {currentNetwork?.name || 'Unknown'}
+                  </span>
                 </div>
               </div>
             </div>

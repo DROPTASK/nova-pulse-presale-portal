@@ -7,7 +7,6 @@ import TokenomicsSection from '../components/TokenomicsSection';
 import PresaleStats from '../components/PresaleStats';
 import ProjectDescription from '../components/ProjectDescription';
 import RoadmapSection from '../components/RoadmapSection';
-import ProfileSection from '../components/ProfileSection';
 import FAQSection from '../components/FAQSection';
 import Footer from '../components/Footer';
 import AnimatedBackground from '../components/AnimatedBackground';
@@ -27,7 +26,6 @@ const Index = () => {
         <TokenomicsSection />
         <ProjectDescription />
         <RoadmapSection />
-        <ProfileSection />
         <FAQSection />
         <Footer />
       </Web3Provider>

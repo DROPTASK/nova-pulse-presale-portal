@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { BrowserProvider, Contract, formatEther, parseEther } from 'ethers';
+import { toast } from '@/hooks/use-toast';
 
 // Add type declaration for window.ethereum
 declare global {
@@ -8,6 +9,55 @@ declare global {
     ethereum?: any;
   }
 }
+
+export type NetworkChain = {
+  id: string;
+  name: string;
+  symbol: string;
+  rpcUrl: string;
+  explorerUrl: string;
+  tokens: ('NATIVE' | 'USDT')[];
+  usdt?: string; // USDT contract address
+};
+
+export const SUPPORTED_NETWORKS: NetworkChain[] = [
+  {
+    id: '0x1',
+    name: 'Ethereum',
+    symbol: 'ETH',
+    rpcUrl: 'https://mainnet.infura.io/v3/your-infura-key',
+    explorerUrl: 'https://etherscan.io',
+    tokens: ['NATIVE', 'USDT'],
+    usdt: '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+  },
+  {
+    id: '0x38',
+    name: 'BNB Smart Chain',
+    symbol: 'BNB',
+    rpcUrl: 'https://bsc-dataseed.binance.org',
+    explorerUrl: 'https://bscscan.com',
+    tokens: ['NATIVE', 'USDT'],
+    usdt: '0x55d398326f99059fF775485246999027B3197955'
+  },
+  {
+    id: '0xa',
+    name: 'Optimism',
+    symbol: 'ETH',
+    rpcUrl: 'https://mainnet.optimism.io',
+    explorerUrl: 'https://optimistic.etherscan.io',
+    tokens: ['USDT'],
+    usdt: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58'
+  },
+  {
+    id: '0x29a',
+    name: 'TON',
+    symbol: 'TON',
+    rpcUrl: 'https://ton-rpc.gateway.pokt.network',
+    explorerUrl: 'https://tonscan.org',
+    tokens: ['USDT'],
+    usdt: '0x76A797A59Ba2C17726896976B7B3747BfD1d220f'
+  }
+];
 
 interface Web3ContextType {
   account: string | null;
@@ -18,6 +68,9 @@ interface Web3ContextType {
   signMessage: (message: string) => Promise<string>;
   sendTransaction: (to: string, value: string) => Promise<string>;
   balance: string;
+  currentNetwork: NetworkChain | null;
+  switchNetwork: (chainId: string) => Promise<boolean>;
+  getCurrentNetworkId: () => Promise<string | null>;
 }
 
 const Web3Context = createContext<Web3ContextType | undefined>(undefined);
@@ -38,6 +91,7 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
   const [account, setAccount] = useState<string | null>(null);
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [balance, setBalance] = useState('0');
+  const [currentNetwork, setCurrentNetwork] = useState<NetworkChain | null>(null);
 
   const connectWallet = async () => {
     if (typeof window.ethereum !== 'undefined') {
@@ -54,6 +108,15 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
         const balance = await browserProvider.getBalance(address);
         setBalance(formatEther(balance));
         
+        // Get current network
+        const networkId = await getCurrentNetworkId();
+        if (networkId) {
+          const network = SUPPORTED_NETWORKS.find(n => n.id === networkId);
+          if (network) {
+            setCurrentNetwork(network);
+          }
+        }
+        
         // Store connection in localStorage
         localStorage.setItem('walletConnected', 'true');
         localStorage.setItem('walletAddress', address);
@@ -67,10 +130,86 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
     }
   };
 
+  const getCurrentNetworkId = async (): Promise<string | null> => {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        return chainId;
+      } catch (error) {
+        console.error('Error getting chainId:', error);
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const switchNetwork = async (chainId: string): Promise<boolean> => {
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        // Request network switch
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId }],
+        });
+        
+        // Update current network
+        const network = SUPPORTED_NETWORKS.find(n => n.id === chainId);
+        if (network) {
+          setCurrentNetwork(network);
+          
+          // Update balance after network switch
+          if (account) {
+            const browserProvider = new BrowserProvider(window.ethereum);
+            const balance = await browserProvider.getBalance(account);
+            setBalance(formatEther(balance));
+          }
+        }
+        
+        return true;
+      } catch (error: any) {
+        // This error code indicates that the chain has not been added to MetaMask.
+        if (error.code === 4902) {
+          const network = SUPPORTED_NETWORKS.find(n => n.id === chainId);
+          if (!network) return false;
+          
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId,
+                  chainName: network.name,
+                  nativeCurrency: {
+                    name: network.symbol,
+                    symbol: network.symbol,
+                    decimals: 18,
+                  },
+                  rpcUrls: [network.rpcUrl],
+                  blockExplorerUrls: [network.explorerUrl],
+                },
+              ],
+            });
+            
+            // Update current network
+            setCurrentNetwork(network);
+            return true;
+          } catch (addError) {
+            console.error('Error adding new network:', addError);
+            return false;
+          }
+        }
+        console.error('Error switching network:', error);
+        return false;
+      }
+    }
+    return false;
+  };
+
   const disconnectWallet = () => {
     setAccount(null);
     setProvider(null);
     setBalance('0');
+    setCurrentNetwork(null);
     localStorage.removeItem('walletConnected');
     localStorage.removeItem('walletAddress');
   };
@@ -107,6 +246,17 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
           connectWallet();
         }
       });
+
+      // Listen for network changes
+      window.ethereum.on('chainChanged', (chainId: string) => {
+        const network = SUPPORTED_NETWORKS.find(n => n.id === chainId);
+        if (network) {
+          setCurrentNetwork(network);
+        } else {
+          setCurrentNetwork(null);
+        }
+        connectWallet(); // Refresh account info for the new network
+      });
     }
   }, []);
 
@@ -121,6 +271,9 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
         signMessage,
         sendTransaction,
         balance,
+        currentNetwork,
+        switchNetwork,
+        getCurrentNetworkId,
       }}
     >
       {children}
