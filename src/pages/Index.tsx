@@ -16,8 +16,8 @@ import { Web3Provider } from '../contexts/Web3Context';
 
 const Index = () => {
   return (
-    <Web3Provider>
-      <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
+    <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
+      <Web3Provider>
         <AnimatedBackground />
         <Header />
         <HeroSection />
@@ -30,8 +30,8 @@ const Index = () => {
         <ProfileSection />
         <FAQSection />
         <Footer />
-      </div>
-    </Web3Provider>
+      </Web3Provider>
+    </div>
   );
 };
 
