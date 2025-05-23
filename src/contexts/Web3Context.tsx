@@ -2,6 +2,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { BrowserProvider, Contract, formatEther, parseEther } from 'ethers';
 
+// Add type declaration for window.ethereum
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 interface Web3ContextType {
   account: string | null;
   provider: BrowserProvider | null;
